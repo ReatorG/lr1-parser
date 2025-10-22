@@ -22,7 +22,7 @@ ALLOWED_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,   # NO uses "*"
-    allow_credentials=False,         # pon True solo si usas cookies/autenticación
+    allow_credentials=True,         # pon True solo si usas cookies/autenticación
     allow_methods=["*"],
     allow_headers=["*"],
 )
