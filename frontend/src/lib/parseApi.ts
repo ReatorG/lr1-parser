@@ -1,4 +1,4 @@
-const API = "https://lr1-parser-1.onrender.com";
+const API = "https://lr1-parser-g7wb.onrender.com";
 
 export type BuildResponse = {
   states: string[][];
