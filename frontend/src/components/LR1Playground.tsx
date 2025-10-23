@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, type JSX } from "react";
 import { buildOnServer, downloadAutomatonPNG, fetchAutomaton, parseOnServer } from "../lib/parseApi";
 
 
