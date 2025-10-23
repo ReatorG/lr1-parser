@@ -2,9 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List, Tuple, Optional, Set
-from lr1 import LR1Builder
+from lr1 import LR1Builder, LR1Item
 from grammar import Grammar
 from first_ import First
+from fastapi import Response, Query
+from graphviz import Source
 
 EPS = "''"   
 END = "$"
@@ -204,3 +206,103 @@ def parse(req: ParseRequest):
     out = [StepDTO(stack=s["stack"], input=s["input"], action=s["action"]) for s in steps]
     
     return ParseResponse(steps=out)
+
+def automaton_dot(states, trans) -> str:
+    lines = ["digraph LR1 {", "rankdir=LR;", 'node [shape=circle,fontname="Inter"];']
+    for i in range(len(states)):
+        lines.append(f'{i} [label="{i}"];')
+    for (i, X), j in trans.items():
+        label = str(X).replace('"', r'\"')
+        lines.append(f'{i} -> {j} [label="{label}"];')
+    lines.append("}")
+    return "\n".join(lines)
+
+def _fmt_item(it) -> str:
+    right = list(it.right)
+    right.insert(it.dot, "·")
+    body = " ".join(right) if right else "·"
+    return f"{it.left} → {body} , {it.look}\\l"
+
+def automaton_dot(states, trans, *, show_items: bool) -> str:
+    lines = [
+        "digraph LR1 {",
+        "rankdir=LR;",
+        'graph [fontname="Inter"];',
+        'node  [fontname="Courier", shape=box, style=rounded];',
+        'edge  [fontname="Inter"];',
+    ]
+
+    for i, I in enumerate(states):
+        if show_items:
+            items = sorted(I, key=lambda x: (x.left, x.dot, x.look, tuple(x.right)))
+            label = f"I{i}\\l" + "".join(_fmt_item(it) for it in items)
+            lines.append(f'{i} [label="{label}"];')
+        else:
+            lines.append(f'{i} [label="{i}", shape=circle, fontname="Inter"];')
+
+    for (i, X), j in trans.items():
+        lbl = str(X).replace('"', r'\"')
+        lines.append(f'{i} -> {j} [label="{lbl}"];')
+
+    lines.append("}")
+    return "\n".join(lines)
+
+@app.post("/automaton/png")
+def automaton_png(
+    req: BuildRequest,
+    detail: str = Query("simple", pattern="^(simple|items)$")
+):
+    G, _, _, _ = parse_grammar(req.rules)
+    states, trans = G.build_automaton()
+    dot_src = automaton_dot(states, trans, show_items=(detail == "items"))
+    png_bytes = Source(dot_src).pipe(format="png")
+    return Response(content=png_bytes, media_type="image/png")
+
+def automaton_nfa_dot(Q, E) -> str:
+    def fmt_item(it: LR1Item) -> str:
+        right = list(it.right)
+        right.insert(it.dot, "·")
+        body = " ".join(right) if right else "·"
+        return f"{it.left} → {body} , {it.look}"
+
+    def item_key(it: LR1Item) -> str:
+        # clave única basada en contenido, no en id(obj)
+        return f"{it.left}->{ ' '.join(it.right[:it.dot])}·{' '.join(it.right[it.dot:])},{it.look}"
+
+    lines = [
+        "digraph NFA_LR1 {",
+        "rankdir=LR;",
+        'graph [fontname="Inter"];',
+        'node  [fontname="Courier", shape=box, style=rounded];',
+        'edge  [fontname="Inter"];',
+    ]
+
+    # nodos
+    seen = set()
+    for it in Q:
+        key = item_key(it)
+        if key in seen:
+            continue
+        seen.add(key)
+        label = fmt_item(it).replace('"', r'\"')
+        lines.append(f'"{key}" [label="{label}"];')
+
+    # aristas
+    for src, label, dst in E:
+        lbl = label.replace('"', r'\"')
+        src_key = item_key(src)
+        dst_key = item_key(dst)
+        lines.append(f'"{src_key}" -> "{dst_key}" [label="{lbl}"];')
+
+    lines.append("}")
+    return "\n".join(lines)
+
+
+
+@app.post("/automaton/nfa/png")
+def automaton_nfa_png(req: BuildRequest):
+    G, _, _, _ = parse_grammar(req.rules)
+    Q, E, _ = G._b.build_nfa_items()  # accedemos al builder real
+    dot_src = automaton_nfa_dot(Q, E)
+    png_bytes = Source(dot_src).pipe(format="png")
+    return Response(content=png_bytes, media_type="image/png")
