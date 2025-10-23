@@ -370,9 +370,9 @@ export default function LR1Playground() {
   const [previewKind, setPreviewKind] = useState<"svg" | "png" | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
-  const [previewDetail, setPreviewDetail] = useState<"simple"|"items">("simple");
+  const [previewDetail, setPreviewDetail] = useState<"simple" | "items" | "nfa">("simple");
 
-  async function openPreview(kind: "svg"|"png", detail: "simple"|"items") {
+  async function openPreview(kind: "svg" | "png", detail: "simple" | "items" | "nfa") {
     try {
       setIsLoadingPreview(true);
       const blob = await fetchAutomaton(kind, rules, detail);
